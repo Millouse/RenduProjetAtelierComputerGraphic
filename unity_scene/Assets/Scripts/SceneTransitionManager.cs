@@ -15,6 +15,7 @@ public class SceneTransitionManager : MonoBehaviour
     public float fadeDuration = 1f;
     
     private CanvasGroup _canvasGroup;
+    public float delayBeforeFade = 1.0f;
 
     private void Awake()
     {
@@ -46,6 +47,7 @@ public class SceneTransitionManager : MonoBehaviour
 
     private IEnumerator Transition(string scene, bool useIndex = false)
     {
+        yield return new WaitForSeconds(delayBeforeFade);
         yield return StartCoroutine(Fade(0f, 1f));
         
         AsyncOperation op = useIndex

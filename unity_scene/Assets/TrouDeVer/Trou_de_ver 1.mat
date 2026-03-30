@@ -20,7 +20,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Trou_de_ver
+  m_Name: Trou_de_ver 1
   m_Shader: {fileID: -6465566751694194690, guid: 768628e246b7f024bbdb98eebb84382c, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -128,9 +128,9 @@ Material:
     - _GlossyReflections: 0
     - _ManualTime: 5
     - _Metallic: 0
-    - _NoiseColorMagnitude: 0
+    - _NoiseColorMagnitude: 2
     - _NoiseMagnitude: 0.01
-    - _NoiseScrollSpeed: 0
+    - _NoiseScrollSpeed: 1
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueControl: 0
@@ -141,16 +141,16 @@ Material:
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
-    - _StarsScrollSpeed: 1.54
+    - _StarsScrollSpeed: 1
     - _Surface: 0
-    - _TimeMultiplier: 0.53
+    - _TimeMultiplier: 0.5
     - _TwistFrequency: 0
     - _TwistMagnitude: 0
-    - _TwistSpeed: 0
+    - _TwistSpeed: 0.8
     - _USEMANUALTIME: 0
-    - _VoronoiJagged: 0
-    - _VoronoiJiggleSpeed: 0
-    - _VoronoiMagnitude: 0
+    - _VoronoiJagged: 1
+    - _VoronoiJiggleSpeed: 0.5
+    - _VoronoiMagnitude: 1
     - _VoronoiScrollSpeed: 0
     - _VoronoiTiling: 0
     - _WorkflowMode: 1
@@ -163,11 +163,11 @@ Material:
     - _Couleur: {r: 0.39999998, g: 0.39999998, b: 0.7411765, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _NoiseColorMagnitude: {r: 0, g: 0, b: 0, a: 1}
-    - _NoiseTiling: {r: 0, g: 0, b: 0, a: 0}
+    - _NoiseTiling: {r: 1, g: 1, b: 0, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _StarsColor: {r: 0.6470588, g: 1, b: 0.003921569, a: 1}
     - _StarsTiling: {r: 2, g: 2, b: 0, a: 0}
-    - _TrouColor: {r: 0, g: 0, b: 0, a: 1}
+    - _TrouColor: {r: 1, g: 0, b: 0.06902981, a: 1}
     - _VoronoiColor: {r: 0.64518696, g: 1, b: 0.003144443, a: 1}
     - _WormHoleColor: {r: 0.39907426, g: 0.39907426, b: 0.74213827, a: 1}
   m_BuildTextureStacks: []
