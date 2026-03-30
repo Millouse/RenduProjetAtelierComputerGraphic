@@ -1,0 +1,124 @@
+#pragma kernel UpdateBoids
+
+struct Boid
+{
+    float3 position;
+    float3 velocity;
+};
+
+RWStructuredBuffer<Boid> boids;
+
+int   boidCount;
+float deltaTime;
+
+float separationRadius;
+float alignmentRadius;
+float cohesionRadius;
+
+float separationWeight;
+float alignmentWeight;
+float cohesionWeight;
+
+float maxSpeed;
+float minSpeed;
+
+float maxSteerForce;  
+float3 boundsSize;
+float  boundsSteering;
+
+float3 SteerTowards(float3 desiredDir, float3 currentVel)
+{
+    float3 desired = normalize(desiredDir) * maxSpeed;
+    float3 steer   = desired - currentVel;
+    float  s       = length(steer);
+    if (s > maxSteerForce)
+        steer = normalize(steer) * maxSteerForce;
+    return steer;
+}
+
+[numthreads(64, 1, 1)]
+void UpdateBoids(uint3 id : SV_DispatchThreadID)
+{
+    uint index = id.x;
+    if ((int)index >= boidCount)
+        return;
+
+    Boid self = boids[index];
+
+    float3 separationForce = float3(0, 0, 0);
+    float3 alignmentSum    = float3(0, 0, 0);
+    float3 cohesionSum     = float3(0, 0, 0);
+
+    int sepCount = 0;
+    int aliCount = 0;
+    int cohCount = 0;
+
+    for (int i = 0; i < boidCount; i++)
+    {
+        if (i == (int)index)
+            continue;
+
+        Boid   other = boids[i];
+        float3 diff  = self.position - other.position;
+        float  dist  = length(diff);
+
+        if (dist < separationRadius && dist > 0.0001f)
+        {
+            separationForce += normalize(diff) / (dist * dist);
+            sepCount++;
+        }
+
+        // Alignment
+        if (dist < alignmentRadius)
+        {
+            alignmentSum += other.velocity;
+            aliCount++;
+        }
+
+        if (dist < cohesionRadius && dist > separationRadius * 0.5f)
+        {
+            cohesionSum += other.position;
+            cohCount++;
+        }
+    }
+
+    float3 acceleration = float3(0, 0, 0);
+
+    if (sepCount > 0)
+        acceleration += SteerTowards(separationForce, self.velocity) * separationWeight;
+
+    if (aliCount > 0)
+    {
+        float3 avgVel = alignmentSum / (float)aliCount;
+        acceleration += SteerTowards(avgVel, self.velocity) * alignmentWeight;
+    }
+
+    if (cohCount > 0)
+    {
+        float3 avgPos   = cohesionSum / (float)cohCount;
+        float3 toCenter = avgPos - self.position;
+        acceleration += SteerTowards(toCenter, self.velocity) * cohesionWeight;
+    }
+
+    // Bounds
+    float3 halfBounds = boundsSize * 0.5f;
+    if (self.position.x >  halfBounds.x) acceleration.x -= boundsSteering;
+    if (self.position.x < -halfBounds.x) acceleration.x += boundsSteering;
+    if (self.position.y >  halfBounds.y) acceleration.y -= boundsSteering;
+    if (self.position.y < -halfBounds.y) acceleration.y += boundsSteering;
+    if (self.position.z >  halfBounds.z) acceleration.z -= boundsSteering;
+    if (self.position.z < -halfBounds.z) acceleration.z += boundsSteering;
+
+    self.velocity += acceleration * deltaTime;
+
+    // Clamp speed
+    float speed = length(self.velocity);
+    if (speed > maxSpeed)
+        self.velocity = normalize(self.velocity) * maxSpeed;
+    if (speed < minSpeed && speed > 0.0001f)
+        self.velocity = normalize(self.velocity) * minSpeed;
+
+    self.position += self.velocity * deltaTime;
+
+    boids[index] = self;
+}
