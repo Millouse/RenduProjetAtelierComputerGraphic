@@ -26,13 +26,23 @@ public class CameraRail : MonoBehaviour
     [Header("Playback")]
     public bool playOnStart = false;
     public bool loop = false;
-    
-    private float _progress = 0f;   // 0..1 along the full path
-    private bool  _playing  = false;
-    private float _totalLength;
-    
+
+    [Header("Teleport Segment")]
+    [Tooltip("If enabled, the camera will instantly teleport from teleportFromWaypoint to teleportToWaypoint.")]
+    public bool useTeleportSegment = true;
+
+    [Tooltip("Index of the waypoint where the teleport starts.")]
+    public int teleportFromWaypoint = 2;
+
+    [Tooltip("Index of the waypoint where the teleport ends.")]
+    public int teleportToWaypoint = 3;
+
     public string sceneToLoadOnEnd = "";
-    
+
+    private float _progress = 0f;
+    private bool _playing = false;
+    private float _totalLength;
+    private bool _teleportDone = false;
 
     private void Start()
     {
@@ -53,31 +63,60 @@ public class CameraRail : MonoBehaviour
         if (!_playing || waypoints == null || waypoints.Length < 2)
             return;
 
-        // Advance progress
         _progress += (speed / _totalLength) * Time.deltaTime;
+
+        if (useTeleportSegment && !_teleportDone && IsTeleportSegmentValid())
+        {
+            int segmentCount = waypoints.Length - 1;
+            float teleportStartT = teleportFromWaypoint / (float)segmentCount;
+            float teleportEndT = teleportToWaypoint / (float)segmentCount;
+
+            if (_progress >= teleportStartT)
+            {
+                _progress = teleportEndT;
+                _teleportDone = true;
+
+                // Snap direct au waypoint d'arrivée
+                transform.position = waypoints[teleportToWaypoint].position;
+
+                if (lookAtTarget != null)
+                {
+                    transform.rotation = Quaternion.LookRotation(lookAtTarget.position - transform.position);
+                }
+                else if (teleportToWaypoint + 1 < waypoints.Length)
+                {
+                    Vector3 dir = (waypoints[teleportToWaypoint + 1].position - transform.position).normalized;
+                    if (dir.sqrMagnitude > 0.0001f)
+                        transform.rotation = Quaternion.LookRotation(dir);
+                }
+            }
+        }
 
         if (_progress >= 1f)
         {
             _progress = loop ? 0f : 1f;
-            if (!loop)
+
+            if (loop)
+            {
+                _teleportDone = false;
+            }
+            else
             {
                 _playing = false;
+
                 if (SceneTransitionManager.Instance != null)
                     SceneTransitionManager.Instance.LoadScene(sceneToLoadOnEnd);
-                else
-                {
-                    if (!string.IsNullOrEmpty(sceneToLoadOnEnd))
-                        SceneManager.LoadScene(sceneToLoadOnEnd);
-                }
+                else if (!string.IsNullOrEmpty(sceneToLoadOnEnd))
+                    SceneManager.LoadScene(sceneToLoadOnEnd);
+
+                return;
             }
-            
         }
-        
+
         float t = ApplyEasing(_progress);
-        
-        Vector3 targetPos = SampleCatmullRom(t);
+        Vector3 targetPos = SampleCustomPath(t);
         transform.position = targetPos;
-        
+
         if (lookAtTarget != null)
         {
             Quaternion desired = Quaternion.LookRotation(lookAtTarget.position - transform.position);
@@ -86,40 +125,93 @@ public class CameraRail : MonoBehaviour
         else
         {
             float tAhead = Mathf.Clamp01(_progress + 0.01f);
-            Vector3 ahead = SampleCatmullRom(tAhead);
+            Vector3 ahead = SampleCustomPath(ApplyEasing(tAhead));
             Vector3 dir = ahead - targetPos;
+
             if (dir.sqrMagnitude > 0.0001f)
             {
-                Quaternion desired = Quaternion.LookRotation(dir);
+                Quaternion desired = Quaternion.LookRotation(dir.normalized);
                 transform.rotation = Quaternion.Slerp(transform.rotation, desired, rotationSpeed * Time.deltaTime);
             }
         }
     }
-    
 
     public void Play()
     {
         _progress = 0f;
-        _playing  = true;
+        _playing = true;
+        _teleportDone = false;
     }
 
-    public void Pause()  => _playing = false;
+    public void Pause() => _playing = false;
     public void Resume() => _playing = true;
 
     public void Stop()
     {
-        _playing  = false;
+        _playing = false;
         _progress = 0f;
+        _teleportDone = false;
     }
 
-    
     public IEnumerator PlayAndWait()
     {
         Play();
-        while (_playing) yield return null;
+        while (_playing)
+            yield return null;
     }
 
-    
+    private bool IsTeleportSegmentValid()
+    {
+        if (waypoints == null || waypoints.Length < 2)
+            return false;
+
+        if (teleportFromWaypoint < 0 || teleportFromWaypoint >= waypoints.Length - 1)
+            return false;
+
+        if (teleportToWaypoint != teleportFromWaypoint + 1)
+            return false;
+
+        if (teleportToWaypoint >= waypoints.Length)
+            return false;
+
+        return true;
+    }
+
+    private Vector3 SampleCustomPath(float t)
+    {
+        int count = waypoints.Length;
+        int segmentCount = count - 1;
+
+        float scaled = t * segmentCount;
+        int currentSegment = Mathf.Clamp(Mathf.FloorToInt(scaled), 0, segmentCount - 1);
+        float localT = scaled - currentSegment;
+
+        if (!useTeleportSegment || !IsTeleportSegmentValid())
+            return SampleCatmullRom(t);
+
+        int beforeSegment = teleportFromWaypoint - 1;
+        int teleportSegment = teleportFromWaypoint;
+        int afterSegment = teleportToWaypoint;
+
+        // Segment avant téléport = ligne droite
+        if (currentSegment == beforeSegment && beforeSegment >= 0)
+        {
+            return Vector3.Lerp(
+                waypoints[beforeSegment].position,
+                waypoints[beforeSegment + 1].position,
+                localT
+            );
+        }
+
+        // Segment téléporté = position instantanée sur le point d'arrivée
+        if (currentSegment == teleportSegment)
+        {
+            return waypoints[teleportToWaypoint].position;
+        }
+
+        return SampleCatmullRom(t);
+    }
+
     private Vector3 SampleCatmullRom(float t)
     {
         int count = waypoints.Length;
@@ -150,54 +242,76 @@ public class CameraRail : MonoBehaviour
 
     private float ApplyEasing(float t)
     {
-    
         float smooth = t * t * (3f - 2f * t);
         return Mathf.Lerp(t, smooth, easing);
     }
 
-    
-    private float EstimatePathLength(int samples = 200)
+    private float EstimatePathLength(int samples = 300)
     {
         float len = 0f;
-        Vector3 prev = SampleCatmullRom(0f);
+        Vector3 prev = SampleCustomPath(0f);
+
         for (int i = 1; i <= samples; i++)
         {
-            Vector3 next = SampleCatmullRom(i / (float)samples);
+            float t = i / (float)samples;
+            Vector3 next = SampleCustomPath(t);
             len += Vector3.Distance(prev, next);
             prev = next;
         }
+
         return Mathf.Max(len, 0.001f);
     }
 
 #if UNITY_EDITOR
     private void OnDrawGizmos()
     {
-        if (waypoints == null || waypoints.Length < 2) return;
+        if (waypoints == null || waypoints.Length < 2)
+            return;
 
-        Gizmos.color = new Color(0.3f, 0.8f, 1f, 0.9f);
-        int steps = 80;
-        Vector3 prev = SampleCatmullRom(0f);
+        int steps = 120;
+        Vector3 prev = SamplePreviewPath(0f);
+
         for (int i = 1; i <= steps; i++)
         {
-            Vector3 next = SampleCatmullRom(i / (float)steps);
+            float t = i / (float)steps;
+            Vector3 next = SamplePreviewPath(t);
+
+            Gizmos.color = new Color(0.3f, 0.8f, 1f, 0.9f);
             Gizmos.DrawLine(prev, next);
             prev = next;
         }
 
-        // Draw waypoint spheres
         Gizmos.color = new Color(1f, 0.85f, 0.2f);
-        foreach (var wp in waypoints)
+        for (int i = 0; i < waypoints.Length; i++)
         {
-            if (wp != null)
-                Gizmos.DrawSphere(wp.position, 0.15f);
+            if (waypoints[i] != null)
+            {
+                Gizmos.DrawSphere(waypoints[i].position, 0.15f);
+#if UNITY_EDITOR
+                UnityEditor.Handles.Label(waypoints[i].position + Vector3.up * 0.25f, $"WP {i}");
+#endif
+            }
         }
 
-        // Draw look-at target
+        if (useTeleportSegment && IsTeleportSegmentValid())
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawLine(
+                waypoints[teleportFromWaypoint].position,
+                waypoints[teleportToWaypoint].position
+            );
+        }
+
         if (lookAtTarget != null)
         {
             Gizmos.color = Color.green;
             Gizmos.DrawWireSphere(lookAtTarget.position, 0.3f);
         }
+    }
+
+    private Vector3 SamplePreviewPath(float t)
+    {
+        return SampleCustomPath(t);
     }
 #endif
 }
