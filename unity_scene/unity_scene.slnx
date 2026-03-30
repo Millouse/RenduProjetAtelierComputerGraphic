@@ -1,0 +1,5 @@
+﻿<Solution>
+  <Project Path="Unity.RenderPipelines.Core.Samples.Runtime.csproj" />
+  <Project Path="Unity.RenderPipelines.Core.Samples.Editor.csproj" />
+  <Project Path="Assembly-CSharp.csproj" />
+</Solution>
